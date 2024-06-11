@@ -1,0 +1,37 @@
+﻿@inject IJSRuntime jsRuntime
+
+
+<div>
+    <h3>Add Role</h3>
+    <EditForm Model="_form" OnValidSubmit="SubmitForm">
+        <label for="message">Message</label>
+        <InputText id="msgInput" @bind-Value="_form.Message" />
+
+        <button type="submit">Submit</button>
+        <button @onclick="Cancel">Cancel</button>
+    </EditForm>
+</div>
+
+@code {
+    private readonly Form _form = new();
+
+    [CascadingParameter] BlazoredModalInstance BlazoredModal { get; set; } = default!;
+
+    protected override void OnInitialized() => BlazoredModal.SetTitle("Add New Role");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await jsRuntime.InvokeVoidAsync("SetFocus", "msgInput");
+        }
+    }
+
+    private async Task SubmitForm() => await BlazoredModal.CloseAsync(ModalResult.Ok(_form.Message));
+    private async Task Cancel() => await BlazoredModal.CancelAsync();
+
+    public class Form
+    {
+        public string Message { get; set; } = string.Empty;
+    }
+}

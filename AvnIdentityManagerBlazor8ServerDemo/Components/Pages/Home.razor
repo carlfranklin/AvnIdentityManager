@@ -1,0 +1,404 @@
+﻿@page "/"
+@inject UserManagementService identityManager
+
+<PageTitle>AvnIdentityManager Demo</PageTitle>
+
+@if (Users == null) 
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <!-- These buttons show you how you can change auth databases on the fly -->
+    <button @onclick="SetFirstConnection">Database 1</button>
+    <button @onclick="SetSecondConnection">Database 2</button>
+    <button @onclick="CreateAuthDatabase">Create Auth Database</button>
+
+    <br />
+    <br />
+
+    <!-- Show all the users in this database -->
+    <h3>Users</h3>
+    <div>Select a user to see role information</div>
+    <div>
+        <span style="font-weight:bold;">Filter: </span><input style="width:20vw;" @bind-value:event="oninput" @bind-value="Filter" @onkeyup="GetUsers" />
+    </div>
+    <select @onchange="UserSelected" @onmouseup="UserMouseUp" size="4" style="width:100%;">
+        @foreach (var user in Users)
+        {
+            <option value="@user.Id">@user.Email</option>
+        }
+    </select>
+    <br />
+    <br />
+    <button @onclick="ShowRolesUI">Roles</button>
+    <button @onclick="ShowAddUI">Add User</button>
+
+    <!-- If a user is selected, show the edit buttton -->
+    @if (SelectedUser != null)
+    {
+        <span>&nbsp;</span>
+        <button @onclick="ShowEditUI">Edit @SelectedUser.Email</button>
+    }
+    <br />
+    <br />
+
+    <!-- UI based on the action requested by the user -->
+    if (Action == UIAction.ShowRoles)
+    {
+        <!-- Show the roles for the selected user -->
+        <h3>Roles</h3>
+        <select @onchange="RoleSelected" @onmouseup="RoleMouseUp" size="4" style="width:100%;">
+            @foreach (var role in Roles)
+            {
+                <option value="@role.Id">@role.Name</option>
+            }
+        </select>
+        <br />
+        <br />
+        <button @onclick="AddRole">Add Role</button>
+        @if (SelectedRole != null)
+        {
+            <button @onclick="() => DeleteRole(SelectedRole.Id)">Delete Role</button>
+        }
+    }
+    else if (Action == UIAction.Add && UserToAdd != null)
+    {
+        <!-- Show an edit form for adding a new user -->
+        <EditForm Model="@UserToAdd" OnValidSubmit="@CreateUser">
+            <h3><b>Create User</b></h3>
+            <hr />
+            <div class="row">
+                <div class="col3">
+                    Username:
+                </div>
+                <div class="col9">
+                    <InputText id="userName" @bind-Value="UserToAdd.UserName" />
+                </div>
+                <div class="col3">
+                    Name:
+                </div>
+                <div class="col9">
+                    <InputText id="name" @bind-Value="UserToAdd.Name" />
+                </div>
+                <div class="col3">
+                    Email:
+                </div>
+                <div class="col9">
+                    <InputText id="email" @bind-Value="UserToAdd.Email" />
+                </div>
+                <div class="col3">
+                    Password:
+                </div>
+                <div class="col9">
+                    <InputText id="password" type="password" @bind-Value="UserToAdd.Password" />
+                </div>
+            </div>
+            <br />
+
+            <button type="submit">Save</button>
+            <br />
+            <br />
+
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+        </EditForm>
+    }
+    else if (Action == UIAction.Edit && SelectedUser != null)
+    {
+        <!-- Show an edit form for editing the selected user -->
+        <EditForm Model="@SelectedUser" OnValidSubmit="@UpdateUser">
+            <h3><b>Edit User</b></h3>
+            <hr />
+            <div class="row">
+                <div class="col3">
+                    Username:
+                </div>
+                <div class="col9">
+                    <InputText id="userName" disabled @bind-Value="SelectedUser!.UserName" />
+                </div>
+                <div class="col3">
+                    Email:
+                </div>
+                <div class="col9">
+                    <InputText id="email" @bind-Value="SelectedUser.Email" />
+                </div>
+                <br />
+                <br />
+                <h4><b>Roles</b></h4>
+                <br />
+                <CheckBoxList Data="@RolesDictionary"
+                              TextField="@((item)=>item.Value)"
+                              ValueField="@((item)=>item.Value)"
+                              SelectedValues="@SelectedRoles" />
+            </div>
+            <br />
+
+            <button type="submit">Save</button>
+            <br />
+            <br />
+
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+        </EditForm>
+    }
+}
+
+@code
+{
+
+    [CascadingParameter] public IModalService Modal { get; set; }
+
+    private UIAction Action;            // The current action requested by the user
+    private IEnumerable<IMUser>? Users; // Current set of users
+    private IEnumerable<IMRole>? Roles; // Current set of roles
+    private string Filter { get; set; } = string.Empty; // User filter
+    private IMUser? SelectedUser;       // Set when a user is selected
+    private IMRole? SelectedRole;       // Set when a role is selected
+    private CreateUserModel UserToAdd;  // We need a model for adding a new user that has data annotations
+    private IMApplicationUser? CurrentUser;     // required to edit and update a user
+    private Response? Response = null;  // Not shown in the UI, but used to show the result of an operation
+    private Dictionary<string, string>? RolesDictionary;    // Roles in a dictionary format
+    private List<KeyValuePair<string, string>>? Claims = new(); // Claims for the selected user. Not shown in UI
+    private List<string> SelectedRoles = new List<string>();    // Those selected by the user, for updating a user's roles
+
+    // The two connection strings for the two databases
+    string connection1 = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=AuthServerDemo;Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False";
+
+    string connection2 = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=AuthWasmDemo;Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False";
+
+    /// <summary>
+    /// Create a new connection string with a unique name
+    /// </summary>
+    /// <returns></returns>
+    string newDbConnection()
+    {
+        var tickNum = DateTime.Now.Ticks.ToString();
+
+        return $"Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=auth-{tickNum};Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False";
+    }
+
+    /// <summary>
+    /// Demonstrate how to create a new auth database and use it
+    /// </summary>
+    void CreateAuthDatabase()
+    {
+        // get cnnection string with unique database name
+        var connection = newDbConnection();
+
+        // create the new auth database
+        identityManager.InitializeDatabase(connection);
+
+        // switch to the new database
+        identityManager.ChangeConnectionString(connection);
+
+        // front-end stuff
+        SelectedUser = null;
+        Action = UIAction.None;
+        GetUsers();
+        GetRoles();
+    }
+
+    /// <summary>
+    /// Switch to the first connection string
+    /// </summary>
+    void SetFirstConnection()
+    {
+        identityManager.ChangeConnectionString(connection1);
+        SelectedUser = null;
+        Action = UIAction.None;
+        GetUsers();
+        GetRoles();
+    }
+
+    /// <summary>
+    /// Switch to the second connection string
+    /// </summary>
+    void SetSecondConnection()
+    {
+        identityManager.ChangeConnectionString(connection2);
+        SelectedUser = null;
+        Action = UIAction.None;
+        GetUsers();
+        GetRoles();
+    }
+
+    /// <summary>
+    /// Add a new role to the auth database
+    /// </summary>
+    async void AddRole()
+    {
+        var messageForm = Modal.Show<GetStringInputModal>();
+        var result = await messageForm.Result;
+
+        if (result.Confirmed)
+        {
+            var newRole = result.Data.ToString();
+            // This one line is all you need to add a new role as a string
+            await identityManager!.CreateRole(newRole);
+            GetRoles();
+        }
+    }
+
+    /// <summary>
+    /// A role has been selected by the user
+    /// </summary>
+    /// <param name="e"></param>
+    void RoleSelected(ChangeEventArgs e)
+    {
+        SelectedRole = Roles.FirstOrDefault(r => r.Id == e.Value.ToString());
+    }
+
+    /// <summary>
+    /// Set up the UI to show the roles
+    /// </summary>
+    void ShowRolesUI()
+    {
+        UserToAdd = null;
+        Action = UIAction.ShowRoles;
+    }
+
+    /// <summary>
+    /// Set up the UI to add a new user
+    /// </summary>
+    void ShowAddUI()
+    {
+        SelectedUser = null;
+        UserToAdd = new CreateUserModel();
+        Action = UIAction.Add;
+    }
+
+    /// <summary>
+    /// Set up the UI to edit a user
+    /// </summary>
+    void ShowEditUI()
+    {
+        UserToAdd = null;
+        Action = UIAction.Edit;
+    }
+
+    /// <summary>
+    /// Update the selected user with the new information
+    /// </summary>
+    private async void UpdateUser()
+    {
+        // Response = await identityManager!.UpdateUser(CurrentUser?.Id!, SelectedUser?.Email!, CurrentUser?.LockoutEnd > DateTime.Now, SelectedRoles.ToArray(), Claims);
+        Response = await identityManager!.UpdateUser(SelectedUser, SelectedRoles);
+        Action = UIAction.None;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// A user has been selected by the app user
+    /// </summary>
+    /// <param name="e"></param>
+    private async void UserSelected(ChangeEventArgs e)
+    {
+        Action = UIAction.None;
+        SelectedUser = Users.FirstOrDefault(u => u.Id == e.Value.ToString());
+        CurrentUser = await identityManager.GetUser(SelectedUser.Id);
+        RolesDictionary = identityManager.Roles;
+        SelectedRoles.Clear();
+
+        foreach (var role in CurrentUser.Roles!)
+        {
+            if (RolesDictionary.ContainsKey(role.RoleId))
+            {
+                SelectedRoles.Add(RolesDictionary[role.RoleId]);
+            }
+        }
+
+        foreach (var claim in CurrentUser.Claims!)
+        {
+            var claimKey = identityManager.ClaimTypes.Where(c => c.Value.Equals(claim.ClaimType)).First().Key;
+            Claims!.Add(new KeyValuePair<string, string>(claimKey, claim.ClaimValue));
+        }
+
+        SelectedUser.Email = CurrentUser.Email;
+
+    }
+
+    /// <summary>
+    /// Create a new user in the auth database
+    /// </summary>
+    async void CreateUser()
+    {
+        Response = await identityManager!.CreateUser(UserToAdd.UserName!, UserToAdd.Name!, UserToAdd.Email!, UserToAdd.Password!);
+        GetUsers();
+    }
+
+    /// <summary>
+    /// Deletes a role by its Id
+    /// </summary>
+    /// <param name="roleId"></param>
+    private async void DeleteRole(string roleId)
+    {
+        var response = await identityManager.DeleteRole(roleId);
+        if (response.Success) 
+            GetRoles();
+    }
+
+    /// <summary>
+    /// Delete a user by its Id.     BE CAREFUL!
+    /// </summary>
+    /// <param name="userId"></param>
+    private async void DeleteUser(string userId)
+    {
+        var response = await identityManager.DeleteUser(userId);
+        if (response.Success)
+            GetUsers();
+    }
+
+    /// <summary>
+    /// Load alll the roles from the auth database
+    /// </summary>
+    void GetRoles()
+    {
+        Roles = identityManager.GetRoles();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Load all the users from the auth database
+    /// </summary>
+    private void GetUsers()
+    {
+        Users = identityManager.GetUsers(Filter);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Required to select a user when there is only one user in the list
+    /// </summary>
+    /// <param name="e"></param>
+    private void UserMouseUp(MouseEventArgs e)
+    {
+        if (Users.Count() == 1)
+        {
+            UserSelected(new ChangeEventArgs { Value = Users.First().Id });
+        }
+    }
+
+    /// <summary>
+    /// Required to select a role when there is only one role in the list
+    /// </summary>
+    /// <param name="e"></param>
+    private void RoleMouseUp(MouseEventArgs e)
+    {
+        if (Roles.Count() == 1)
+        {
+            RoleSelected(new ChangeEventArgs { Value = Roles.First().Id });
+        }
+    }
+
+    /// <summary>
+    /// Load the users and roles when the page starts
+    /// </summary>
+    /// <returns></returns>
+    protected override void OnInitialized()
+    {
+        GetUsers();
+        GetRoles();
+    }
+
+}
