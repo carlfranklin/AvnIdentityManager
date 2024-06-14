@@ -57,7 +57,7 @@ public class UserManagementService
     /// <param name="password">Password for the user.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> CreateUser(string userName, string name, string email, string password)
+    public async Task<Response> CreateUserAsync(string userName, string name, string email, string password)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new ArgumentNullException("userName", "The argument userName cannot be null or empty.");
@@ -92,7 +92,57 @@ public class UserManagementService
         return response;
     }
 
+    /// <summary>
+    /// Lock the user account for a given period
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <param name="lockoutEnd"></param>
+    /// <returns></returns>
+    public async Task<bool> LockUserAsync(string userId, DateTimeOffset? lockoutEnd)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return false;
+        }
 
+        var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
+        return result.Succeeded;
+    }
+
+    /// <summary>
+    /// Unlock the user
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <returns></returns>
+    public async Task<bool> UnlockUserAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return false;
+        }
+
+        var result = await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.Now);
+        return result.Succeeded;
+    }
+
+    /// <summary>
+    /// Reset the lockout count for the user
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <returns></returns>
+    public async Task<bool> ResetLockoutCountAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return false;
+        }
+
+        var result = await _userManager.ResetAccessFailedCountAsync(user);
+        return result.Succeeded;
+    }
 
     /// <summary>
     /// Returns a collection of users from the database.
@@ -124,7 +174,8 @@ public class UserManagementService
             //Key/Value props not camel cased (https://github.com/dotnet/corefx/issues/41309)
             Claims = u.Claims.Select(c => new KeyValuePair<string, string>(ClaimTypes.Single(x => x.Value == c.ClaimType).Key, c.ClaimValue)),
             DisplayName = u.Claims?.FirstOrDefault(c => c.ClaimType == System.Security.Claims.ClaimTypes.Name)?.ClaimValue,
-            UserName = u.UserName
+            UserName = u.UserName,
+            EmailConfirmed = u.EmailConfirmed
         });
 
         return result;
@@ -138,7 +189,7 @@ public class UserManagementService
     /// <returns>Returns the ApplicationUser object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
     /// <exception cref="Exception">Throws an exception when the user is not found.</exception>
-    public async Task<IMApplicationUser> GetUser(string id)
+    public async Task<IMApplicationUser> GetUserAsync(string id)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
@@ -152,84 +203,14 @@ public class UserManagementService
         return user;
     }
 
-    ///// <summary>
-    ///// Update the user.
-    ///// </summary>
-    ///// <param name="id">ID of the user.</param>
-    ///// <param name="email">Email of the user.</param>
-    ///// <param name="locked">Weather or not the user account is locked.</param>
-    ///// <param name="roles">List of roles the user should be added to.</param>
-    ///// <param name="claims">List of claims the user should be added to.</param>
-    ///// <returns>Response object.</returns>
-    ///// <exception cref="ArgumentNullException">When any of the arguments is not provided, an ArgumentNullException will be thrown.</exception>
-    //public async Task<Response> UpdateUser(string id, string email, bool locked, string[] roles, List<KeyValuePair<string, string>> claims)
-    //{
-    //    if (string.IsNullOrWhiteSpace(id))
-    //        throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
-
-    //    if (string.IsNullOrWhiteSpace(email))
-    //        throw new ArgumentNullException("email", "The argument email cannot be null or empty.");
-
-    //    if (roles == null)
-    //        throw new ArgumentNullException("roles", "The argument roles cannot be null.");
-
-    //    var response = new Response();
-
-    //    try
-    //    {
-    //        // Gets the user by ID.
-    //        var user = await _userManager.FindByIdAsync(id);
-    //        if (user == null)
-    //            response.Messages = "User not found.";
-
-    //        // Update only the updatable properties.
-    //        user!.Email = email;
-    //        user.LockoutEnd = locked ? DateTimeOffset.MaxValue : default(DateTimeOffset?);
-
-    //        // Update user.
-    //        var result = await _userManager.UpdateAsync(user);
-
-    //        if (result.Succeeded)
-    //        {
-    //            response.Messages += $"Updated user {user.UserName}";
-
-    //            // Get the current user roles.
-    //            var userRoles = await _userManager.GetRolesAsync(user);
-
-    //            // Add specified user roles.
-    //            foreach (string role in roles.Except(userRoles))
-    //                await _userManager.AddToRoleAsync(user, role);
-
-    //            // Remove any roles, not specified, from the user. 
-    //            foreach (string role in userRoles.Except(roles))
-    //                await _userManager.RemoveFromRoleAsync(user, role);
-
-    //            // Get the current user claims.
-    //            var userClaims = await _userManager.GetClaimsAsync(user);
-
-    //            // Add specified user claims.
-    //            foreach (var kvp in claims.Where(a => !userClaims.Any(b => ClaimTypes[a.Key] == b.Type && a.Value == b.Value)))
-    //                await _userManager.AddClaimAsync(user, new Claim(ClaimTypes[kvp.Key], kvp.Value));
-
-    //            // Remove any claims, not specified, from the user. 
-    //            foreach (var claim in userClaims.Where(a => !claims.Any(b => a.Type == ClaimTypes[b.Key] && a.Value == b.Value)))
-    //                await _userManager.RemoveClaimAsync(user, claim);
-    //        }
-    //        else
-    //            response.Messages = result.Errors.GetAllMessages();
-
-    //        response.Success = result.Succeeded;
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        response.Messages = $"Failure updating user {id}: {ex.Message}";
-    //    }
-
-    //    return response;
-    //}
-
-
-    public async Task<Response> UpdateUser(IMUser iMUser, List<string> roles)
+    /// <summary>
+    /// Update the user
+    /// </summary>
+    /// <param name="iMUser"></param>
+    /// <param name="roles"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    public async Task<Response> UpdateUserAsync(IMUser iMUser, List<string> roles)
     {
         if (iMUser == null)
             throw new ArgumentNullException("iMUser", "The argument iMUser cannot be null.");
@@ -245,6 +226,8 @@ public class UserManagementService
 
             // Update only the updatable properties.
             user!.Email = iMUser.Email;
+
+            user!.EmailConfirmed = iMUser.EmailConfirmed;
 
             // Update user.
             var result = await _userManager.UpdateAsync(user);
@@ -290,6 +273,24 @@ public class UserManagementService
         return response;
     }
 
+    /// <summary>
+    /// Change the user's password
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <param name="currentPassword"></param>
+    /// <param name="newPassword"></param>
+    /// <returns></returns>
+    public async Task<IdentityResult> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+        }
+
+        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        return result;
+    }
 
     /// <summary>
     /// Delete user by ID.
@@ -297,7 +298,7 @@ public class UserManagementService
     /// <param name="id">ID of the user.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> DeleteUser(string id, bool deleteUserRoleAssignments = false)
+    public async Task<Response> DeleteUserAsync(string id, bool deleteUserRoleAssignments = false)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
@@ -348,7 +349,7 @@ public class UserManagementService
     /// <param name="verify">Password for verification purposes.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> ResetPassword(string id, string password, string verify)
+    public async Task<Response> ResetPasswordAsync(string id, string password, string verify)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
@@ -427,7 +428,7 @@ public class UserManagementService
     /// <param name="name">Role name.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> CreateRole(string name)
+    public async Task<Response> CreateRoleAsync(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentNullException("name", "The argument name cannot be null or empty.");
@@ -459,7 +460,7 @@ public class UserManagementService
     /// <param name="claims">List of claims the role should be added to.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> UpdateRole(string id, string name, List<KeyValuePair<string, string>> claims)
+    public async Task<Response> UpdateRoleAsync(string id, string name, List<KeyValuePair<string, string>> claims)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
@@ -520,7 +521,7 @@ public class UserManagementService
     /// <param name="id">ID of the role.</param>
     /// <returns>Response object.</returns>
     /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> DeleteRole(string id, bool deleteUserAssignments = false)
+    public async Task<Response> DeleteRoleAsync(string id, bool deleteUserAssignments = false)
     {
         if (string.IsNullOrWhiteSpace(id))
             throw new ArgumentNullException("id", "The argument id cannot be null or empty.");

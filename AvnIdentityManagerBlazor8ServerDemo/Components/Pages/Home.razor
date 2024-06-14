@@ -118,19 +118,29 @@ else
                     <InputText id="userName" disabled @bind-Value="SelectedUser!.UserName" />
                 </div>
                 <div class="col3">
+                    <br />
                     Email:
                 </div>
                 <div class="col9">
                     <InputText id="email" @bind-Value="SelectedUser.Email" />
                 </div>
-                <br />
-                <br />
-                <h4><b>Roles</b></h4>
-                <br />
-                <CheckBoxList Data="@RolesDictionary"
-                              TextField="@((item)=>item.Value)"
-                              ValueField="@((item)=>item.Value)"
-                              SelectedValues="@SelectedRoles" />
+                <div>
+                    <br />
+                    <InputCheckbox @bind-Value="SelectedUser.EmailConfirmed" /> <span>&nbsp; Email Confirmed</span>
+                </div>
+                <div>
+                    <br />
+                    <h4><b>Roles</b></h4>
+                    <br />
+                    <CheckBoxList Data="@RolesDictionary"
+                                  TextField="@((item)=>item.Value)"
+                                  ValueField="@((item)=>item.Value)"
+                                  SelectedValues="@SelectedRoles" />
+
+                    <br />
+                    <br />
+                </div>
+
             </div>
             <br />
 
@@ -235,7 +245,7 @@ else
         {
             var newRole = result.Data.ToString();
             // This one line is all you need to add a new role as a string
-            await identityManager!.CreateRole(newRole);
+            await identityManager!.CreateRoleAsync(newRole);
             GetRoles();
         }
     }
@@ -283,7 +293,7 @@ else
     private async void UpdateUser()
     {
         // Response = await identityManager!.UpdateUser(CurrentUser?.Id!, SelectedUser?.Email!, CurrentUser?.LockoutEnd > DateTime.Now, SelectedRoles.ToArray(), Claims);
-        Response = await identityManager!.UpdateUser(SelectedUser, SelectedRoles);
+        Response = await identityManager!.UpdateUserAsync(SelectedUser, SelectedRoles);
         Action = UIAction.None;
         StateHasChanged();
     }
@@ -296,7 +306,7 @@ else
     {
         Action = UIAction.None;
         SelectedUser = Users.FirstOrDefault(u => u.Id == e.Value.ToString());
-        CurrentUser = await identityManager.GetUser(SelectedUser.Id);
+        CurrentUser = await identityManager.GetUserAsync(SelectedUser.Id);
         RolesDictionary = identityManager.Roles;
         SelectedRoles.Clear();
 
@@ -323,7 +333,7 @@ else
     /// </summary>
     async void CreateUser()
     {
-        Response = await identityManager!.CreateUser(UserToAdd.UserName!, UserToAdd.Name!, UserToAdd.Email!, UserToAdd.Password!);
+        Response = await identityManager!.CreateUserAsync(UserToAdd.UserName!, UserToAdd.Name!, UserToAdd.Email!, UserToAdd.Password!);
         GetUsers();
     }
 
@@ -333,7 +343,7 @@ else
     /// <param name="roleId"></param>
     private async void DeleteRole(string roleId)
     {
-        var response = await identityManager.DeleteRole(roleId);
+        var response = await identityManager.DeleteRoleAsync(roleId, true);
         if (response.Success) 
             GetRoles();
     }
@@ -344,7 +354,7 @@ else
     /// <param name="userId"></param>
     private async void DeleteUser(string userId)
     {
-        var response = await identityManager.DeleteUser(userId);
+        var response = await identityManager.DeleteUserAsync(userId, true);
         if (response.Success)
             GetUsers();
     }

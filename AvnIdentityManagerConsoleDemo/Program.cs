@@ -127,7 +127,7 @@ static void AddUser(UserManagementService service)
     Console.Write("Enter password: ");
     var password = ReadPassword(); // Use the custom ReadPassword method
 
-    var response = service.CreateUser(username, name, email, password).Result;
+    var response = service.CreateUserAsync(username, name, email, password).Result;
     if (response.Success)
     {
         Console.WriteLine("User added successfully.");
@@ -145,7 +145,7 @@ static void AddRole(UserManagementService service)
     Console.Write("Enter role name: ");
     var roleName = Console.ReadLine();
 
-    var response = service.CreateRole(roleName).Result;
+    var response = service.CreateRoleAsync(roleName).Result;
     if (response.Success)
     {
         Console.WriteLine("Role added successfully.");
@@ -179,7 +179,7 @@ static void ModifyUserRoles(UserManagementService service)
     Console.Write("Enter roles to assign (comma-separated): ");
     var roles = Console.ReadLine().Split(',').ToList();
 
-    var response = service.UpdateUser(user, roles).Result;
+    var response = service.UpdateUserAsync(user, roles).Result;
     if (response.Success)
     {
         Console.WriteLine("User roles updated successfully.");
@@ -204,7 +204,7 @@ static void DeleteUser(UserManagementService service)
 
     Console.Write("Do you want to delete the user role assignments? (y/n): ");
     var deleteRoles = Console.ReadLine().ToLower() == "y";
-    var response = service.DeleteUser(user.Id, deleteRoles).Result;
+    var response = service.DeleteUserAsync(user.Id, deleteRoles).Result;
     if (response.Success)
     {
         Console.WriteLine("User deleted successfully.");
@@ -230,7 +230,7 @@ static void DeleteRole(UserManagementService service)
     Console.Write("Do you want to delete the user role assignments? (y/n): ");
     var deleteRoles = Console.ReadLine().ToLower() == "y";
 
-    var response = service.DeleteRole(role.Id, deleteRoles).Result;
+    var response = service.DeleteRoleAsync(role.Id, deleteRoles).Result;
     if (response.Success)
     {
         Console.WriteLine("Role deleted successfully.");

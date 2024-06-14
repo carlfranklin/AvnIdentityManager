@@ -12,4 +12,5 @@ public class IMUser
     public IEnumerable<KeyValuePair<string, string>>? Claims { get; set; }
     public string? DisplayName { get; set; }
     public string? UserName { get; set; }
+    public bool EmailConfirmed { get; set; }
 }
