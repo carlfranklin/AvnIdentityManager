@@ -123,7 +123,9 @@ public class UserManagementService
             return false;
         }
 
-        var result = await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.Now);
+        var offset = DateTimeOffset.Now.Subtract(TimeSpan.FromMinutes(1));
+        var result = await _userManager.SetLockoutEndDateAsync(user, offset);
+
         return result.Succeeded;
     }
 
@@ -169,7 +171,7 @@ public class UserManagementService
         {
             Id = u.Id,
             Email = u.Email,
-            LockedOut = u.LockoutEnd == null ? string.Empty : "Yes",
+            LockedOut = u.LockoutEnd == null || u.LockoutEnd < DateTime.Now ? string.Empty : "Yes",
             Roles = u.Roles.Select(r => Roles[r.RoleId]),
             //Key/Value props not camel cased (https://github.com/dotnet/corefx/issues/41309)
             Claims = u.Claims.Select(c => new KeyValuePair<string, string>(ClaimTypes.Single(x => x.Value == c.ClaimType).Key, c.ClaimValue)),
@@ -280,16 +282,30 @@ public class UserManagementService
     /// <param name="currentPassword"></param>
     /// <param name="newPassword"></param>
     /// <returns></returns>
-    public async Task<IdentityResult> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
+    public async Task<Response> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
     {
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
-        {
-            return IdentityResult.Failed(new IdentityError { Description = "User not found." });
-        }
+        var response = new Response();
 
-        var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
-        return result;
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                response.Messages = "User not found.";
+            else
+            {
+                var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+                if (result.Succeeded)
+                    response.Messages = "Password changed.";
+                else
+                    response.Messages = result.Errors.GetAllMessages();
+                response.Success = result.Succeeded;
+            }
+        }
+        catch (Exception ex)
+        {
+            response.Messages = $"Failure changing password.";
+        }
+        return response;
     }
 
     /// <summary>
