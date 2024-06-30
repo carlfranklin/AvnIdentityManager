@@ -5,7 +5,6 @@ using AvnIdentityManager.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,6 +36,10 @@ public class UserManagementService
         Initialize();
     }
 
+    /// <summary>
+    /// Initialize the roles and claim types.
+    /// Called whenever the service is created or the connection string is changed.
+    /// </summary>
     void Initialize()
     {
         //// Set all the roles in the database, ordered by Name ascending.
@@ -285,7 +288,7 @@ public class UserManagementService
     public async Task<Response> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
     {
         var response = new Response();
-
+        response.Success = false;
         try
         {
             var user = await _userManager.FindByIdAsync(userId);
@@ -295,9 +298,12 @@ public class UserManagementService
             {
                 var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
                 if (result.Succeeded)
+                {
                     response.Messages = "Password changed.";
+                }
                 else
                     response.Messages = result.Errors.GetAllMessages();
+
                 response.Success = result.Succeeded;
             }
         }
@@ -357,59 +363,6 @@ public class UserManagementService
         return response;
     }
 
-    /// <summary>
-    /// Reset user password.
-    /// </summary>
-    /// <param name="id">ID of the user.</param>
-    /// <param name="password">Password for the user.</param>
-    /// <param name="verify">Password for verification purposes.</param>
-    /// <returns>Response object.</returns>
-    /// <exception cref="ArgumentNullException">When any of the arguments are not provided, an ArgumentNullException will be thrown.</exception>
-    public async Task<Response> ResetPasswordAsync(string id, string password, string verify)
-    {
-        if (string.IsNullOrWhiteSpace(id))
-            throw new ArgumentNullException("id", "The argument id cannot be null or empty.");
-
-        if (string.IsNullOrWhiteSpace(password))
-            throw new ArgumentNullException("password", "The argument password cannot be null or empty.");
-
-        if (string.IsNullOrWhiteSpace(verify))
-            throw new ArgumentNullException("verify", "The argument verify cannot be null or empty.");
-
-        var response = new Response();
-
-        try
-        {
-            if (password != verify)
-                response.Messages = "Passwords entered do not match.";
-
-            // Get the user.
-            var user = await _userManager.FindByIdAsync(id);
-
-            if (user == null)
-                response.Messages = "User not found.";
-
-            // Delete existing password if it exists.
-            if (await _userManager.HasPasswordAsync(user!))
-                await _userManager.RemovePasswordAsync(user!);
-
-            // Add new password for the user.
-            var result = await _userManager.AddPasswordAsync(user!, password);
-
-            if (result.Succeeded)
-            {
-                response.Messages = $"Password reset for {user!.UserName}.";
-            }
-            else
-                response.Messages = result.Errors.GetAllMessages();
-        }
-        catch (Exception ex)
-        {
-            response.Messages = $"Failed password reset for user {id}: {ex.Message}";
-        }
-
-        return response;
-    }
 
     /// <summary>
     /// Get user roles.
@@ -583,6 +536,11 @@ public class UserManagementService
         return response;
     }
 
+    /// <summary>
+    /// Creates or re-creates the DbContext from the supplied connection string.
+    /// </summary>
+    /// <param name="connectionString"></param>
+    /// <returns></returns>
     private ApplicationDbContext CreateDbContext(string connectionString)
     {
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
@@ -591,6 +549,11 @@ public class UserManagementService
         return new ApplicationDbContext(optionsBuilder.Options);
     }
 
+    /// <summary>
+    /// Creates a user manager with the provided context.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <returns></returns>
     private UserManager<IMApplicationUser> CreateUserManager(ApplicationDbContext context)
     {
         var userStore = new UserStore<IMApplicationUser, IMApplicationRole, ApplicationDbContext>(context);
@@ -608,6 +571,11 @@ public class UserManagementService
         );
     }
 
+    /// <summary>
+    /// Loads the roles and claim types from the database, and sets the role manager.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <returns></returns>
     private RoleManager<IMApplicationRole> CreateRoleManager(ApplicationDbContext context)
     {
         var roleStore = new RoleStore<IMApplicationRole, ApplicationDbContext>(context);
@@ -621,6 +589,56 @@ public class UserManagementService
         );
     }
 
+    /// <summary>
+    /// Resets the users's password without requirding the existing password. 
+    /// This should only be called by an administrator when the user has forgotten their password
+    /// And does not have access to their email, which would allow them to reset their password.
+    /// </summary>
+    /// <param name="resetPasswordModel"></param>
+    /// <returns></returns>
+    public async Task<Response> HardResetPassword(ResetPasswordModel resetPasswordModel)
+    {
+        var response = new Response();
+        response.Success = false;
+
+        try
+        {
+            var user = await _userManager.FindByIdAsync(resetPasswordModel.UserId);
+
+            if (user == null)
+            {
+                response.Success = false;
+                response.Messages = "User not found.";
+                return response;
+            }
+
+            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, resetPasswordModel.NewPassword);
+            var result = await _userManager.UpdateAsync(user);
+
+            if (result.Succeeded)
+            {
+                response.Messages = "Password changed.";
+            }
+            else
+            {
+                response.Messages = "Error resetting password: " + string.Join(", ", result.Errors.Select(e => e.Description));
+            }
+
+            response.Success = result.Succeeded;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            response.Messages = "Error resetting password: " + ex.Message;
+            return response;
+        }
+    }
+
+    /// <summary>
+    /// Change the connection string for the auth database, which allows the service 
+    /// to connect to and use a different auth database on the fly.
+    /// </summary>
+    /// <param name="newConnectionString"></param>
     public void ChangeConnectionString(string newConnectionString)
     {
         // pre-process the connection string
@@ -633,6 +651,12 @@ public class UserManagementService
         Initialize();
     }
 
+    /// <summary>
+    /// Creates the auth database with the provided connection string.
+    /// Be careful not to overwrite an existing database, which would wipe out the 
+    /// existing accounts
+    /// </summary>
+    /// <param name="connectionString"></param>
     public void InitializeDatabase(string connectionString)
     {
         // pre-process the connection string
