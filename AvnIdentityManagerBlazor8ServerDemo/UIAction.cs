@@ -7,4 +7,5 @@ public enum UIAction
     Edit,
     ShowRoles,
     AddRole,
+    ChangePassword
 }

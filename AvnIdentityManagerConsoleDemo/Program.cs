@@ -60,6 +60,8 @@ static void RunInteractiveMode(UserManagementService service)
         Console.WriteLine("7. Delete a role");
         Console.WriteLine("8. Show all users");
         Console.WriteLine("9. Show all roles");
+        Console.WriteLine("10. Change user password");
+        Console.Write("> ");
         var choice = Console.ReadLine();
         Console.WriteLine();
         switch (choice)
@@ -90,6 +92,9 @@ static void RunInteractiveMode(UserManagementService service)
                 break;
             case "9":
                 ShowAllRoles(service);
+                break;
+            case "10":
+                ChangePassword(service);
                 break;
             default:
                 Console.WriteLine("Invalid choice");
@@ -138,8 +143,6 @@ static void AddUser(UserManagementService service)
     }
 }
 
-
-
 static void AddRole(UserManagementService service)
 {
     Console.Write("Enter role name: ");
@@ -155,6 +158,51 @@ static void AddRole(UserManagementService service)
         Console.WriteLine($"Failed to add role: {response.Messages}");
     }
 }
+
+static void ChangePassword(UserManagementService service)
+{
+    ShowAllUsers(service);
+
+    Console.Write("Enter username: ");
+    var username = Console.ReadLine();
+
+    var user = service.GetUsers(username).FirstOrDefault();
+    if (user == null)
+    {
+        Console.WriteLine("User not found.");
+        return;
+    }
+
+    Console.Write("Enter new password: ");
+    var password1 = ReadPassword();
+
+    Console.Write("Confirm new password: ");
+    var password2 = ReadPassword();
+
+    if (password1 != password2)
+    {
+        Console.WriteLine("Passwords do not match.");
+        return;
+    }
+
+    var model = new ResetPasswordModel()
+    {
+        UserId = user.Id,
+        NewPassword = password1,
+        ConfirmPassword = password2
+    };
+
+    var response = service.HardResetPassword(model).Result;
+    if (response.Success)
+    {
+        Console.WriteLine("User password updated successfully.");
+    }
+    else
+    {
+        Console.WriteLine($"Failed to update user password: {response.Messages}");
+    }
+}
+
 static void ModifyUserRoles(UserManagementService service)
 {
     ShowAllUsers(service);

@@ -39,6 +39,8 @@ else
     {
         <span>&nbsp;</span>
         <button @onclick="ShowEditUI">Edit @SelectedUser.Email</button>
+        <span>&nbsp;</span>
+        <button @onclick="ShowChangePasswordUI">Change Password for @SelectedUser.Email</button>
     }
     <br />
     <br />
@@ -152,6 +154,37 @@ else
             <ValidationSummary />
         </EditForm>
     }
+    else if (Action == UIAction.ChangePassword && SelectedUser != null)
+    {
+        <!-- Show an edit form for editing the selected user -->
+        <EditForm Model="@ResetPasswordModel" OnValidSubmit="@ChangePassword">
+            <h3><b>Edit User</b></h3>
+            <hr />
+            <div class="row">
+                <div class="col3">
+                    Password:
+                </div>
+                <div class="col9">
+                    <InputText id="password1" type="password" @bind-Value="ResetPasswordModel.NewPassword" />
+                </div>
+                <div class="col3">
+                    Confirm Password:
+                </div>
+                <div class="col9">
+                    <InputText id="password2" type="password" @bind-Value="ResetPasswordModel.ConfirmPassword" />
+                </div>
+
+            </div>
+            <br />
+
+            <button type="submit">Save</button>
+            <br />
+            <br />
+
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+        </EditForm>
+    }
 }
 
 @code
@@ -171,6 +204,7 @@ else
     private Dictionary<string, string>? RolesDictionary;    // Roles in a dictionary format
     private List<KeyValuePair<string, string>>? Claims = new(); // Claims for the selected user. Not shown in UI
     private List<string> SelectedRoles = new List<string>();    // Those selected by the user, for updating a user's roles
+    private ResetPasswordModel ResetPasswordModel;
 
     // The two connection strings for the two databases
     string connection1 = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=AuthServerDemo;Integrated Security=True;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False";
@@ -288,12 +322,33 @@ else
     }
 
     /// <summary>
+    /// Set up the UI to change a user's password
+    /// </summary>
+    void ShowChangePasswordUI()
+    {
+        UserToAdd = null;
+        ResetPasswordModel = new ResetPasswordModel();
+        ResetPasswordModel.UserId = SelectedUser.Id;
+        Action = UIAction.ChangePassword;
+    }
+
+    /// <summary>
     /// Update the selected user with the new information
     /// </summary>
     private async void UpdateUser()
     {
         // Response = await identityManager!.UpdateUser(CurrentUser?.Id!, SelectedUser?.Email!, CurrentUser?.LockoutEnd > DateTime.Now, SelectedRoles.ToArray(), Claims);
         Response = await identityManager!.UpdateUserAsync(SelectedUser, SelectedRoles);
+        Action = UIAction.None;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Change the selected user's password without requiring the old password
+    /// </summary>
+    private async void ChangePassword()
+    {
+        Response = await identityManager!.HardResetPassword(ResetPasswordModel);
         Action = UIAction.None;
         StateHasChanged();
     }
