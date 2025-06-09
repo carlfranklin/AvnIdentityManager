@@ -1,6 +1,6 @@
 # AvnIdentityManager
 
-A self-contained .NET 8 manager for ASP.NET Core Identity SQL databases.
+A self-contained .NET 9 manager for ASP.NET Core Identity SQL databases.
 
 **Actions:**
 
