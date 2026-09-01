@@ -1,6 +1,6 @@
 # AvnIdentityManager
 
-A self-contained .NET 9 manager for ASP.NET Core Identity SQL databases.
+A self-contained .NET 10 manager for ASP.NET Core Identity SQL databases.
 
 **Actions:**
 
@@ -19,7 +19,7 @@ A self-contained .NET 9 manager for ASP.NET Core Identity SQL databases.
 
 The **AvnIdentityManager** is a self-contained class library for managing an ASP.NET Core Identity SQL database.
 
-The **AvnIdentityManagerBlazor8ServerDemo** project, is a .NET 8 Blazor Web App in Global Server interactivity mode that shows some sample UI for using the library. 
+The **AvnIdentityManagerBlazorServerDemo** project, is a .NET 10 Blazor Web App in Global Server interactivity mode that shows some sample UI for using the library. 
 
 :point_up: You can use the demo app for your own Auth databases. You will need to:
 

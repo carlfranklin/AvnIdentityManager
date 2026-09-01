@@ -1,4 +1,4 @@
-﻿namespace AvnIdentityManagerBlazor8ServerDemo;
+﻿namespace AvnIdentityManagerBlazorServerDemo;
 
 public enum UIAction
 {

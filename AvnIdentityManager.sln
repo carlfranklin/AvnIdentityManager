@@ -5,7 +5,7 @@ VisualStudioVersion = 17.10.34916.146
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AvnIdentityManager", "AvnIdentityManager\AvnIdentityManager.csproj", "{51EF688E-2854-40B2-915B-B0FDE762F687}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AvnIdentityManagerBlazor8ServerDemo", "AvnIdentityManagerBlazor8ServerDemo\AvnIdentityManagerBlazor8ServerDemo.csproj", "{BF252C77-6022-4ED6-8515-3D1B4EC76DDE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AvnIdentityManagerBlazorServerDemo", "AvnIdentityManagerBlazorServerDemo\AvnIdentityManagerBlazorServerDemo.csproj", "{BF252C77-6022-4ED6-8515-3D1B4EC76DDE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AvnIdentityManagerConsoleDemo", "AvnIdentityManagerConsoleDemo\AvnIdentityManagerConsoleDemo.csproj", "{7BC772FE-DE0B-461A-8ED6-AEC91F73AF4A}"
 EndProject

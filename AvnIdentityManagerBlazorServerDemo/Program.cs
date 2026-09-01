@@ -1,5 +1,5 @@
 global using Blazored.Modal;
-using AvnIdentityManagerBlazor8ServerDemo.Components;
+using AvnIdentityManagerBlazorServerDemo.Components;
 using AvnIdentityManager;
 
 var builder = WebApplication.CreateBuilder(args);
