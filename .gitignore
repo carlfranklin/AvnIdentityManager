@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /nuget.txt
+
+# AI memory files (public repo — keep untracked)
+AI_*.md
