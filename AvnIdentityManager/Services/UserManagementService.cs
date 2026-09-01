@@ -109,6 +109,16 @@ public class UserManagementService
             return false;
         }
 
+        // Lockout must be enabled for the lockout end date to take effect.
+        if (!user.LockoutEnabled)
+        {
+            var enableResult = await _userManager.SetLockoutEnabledAsync(user, true);
+            if (!enableResult.Succeeded)
+            {
+                return false;
+            }
+        }
+
         var result = await _userManager.SetLockoutEndDateAsync(user, lockoutEnd);
         return result.Succeeded;
     }
